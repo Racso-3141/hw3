@@ -5,6 +5,7 @@
 #include <cmath>
 #include <iostream>
 #include <stdexcept>
+#include <vector>
 
 namespace needle {
 namespace cpu {
@@ -62,7 +63,35 @@ void Compact(const AlignedArray& a, AlignedArray* out, std::vector<int32_t> shap
    *  function will implement here, so we won't repeat this note.)
    */
   /// BEGIN SOLUTION
-  assert(false && "Not Implemented");
+   int32_t count = 0;
+  std::vector<int32_t> indices(shape.size(), 0);
+  int32_t total_elements = 1;
+  for (auto dim : shape) {
+    total_elements *= dim;
+  }
+
+  int32_t last_dim = shape.size() - 1;
+  int32_t last_dim_size = shape[last_dim];
+
+  while (count < total_elements) {
+    int32_t a_idx = offset;
+    for (int32_t i = 0; i < indices.size(); ++i) {
+      a_idx += indices[i] * strides[i];
+    }
+    for (int32_t j = 0; j < last_dim_size; ++j) {
+      out->ptr[count] = a.ptr[a_idx];
+      a_idx += strides[last_dim];
+      count++;
+    }
+    int32_t carry = 1;
+    int k = last_dim - 1;
+    while (carry && k >= 0) {
+      indices[k] += carry;
+      carry = indices[k] / shape[k];
+      indices[k] %= shape[k];
+      k--;
+    }
+  }
   /// END SOLUTION
 }
 
@@ -79,7 +108,35 @@ void EwiseSetitem(const AlignedArray& a, AlignedArray* out, std::vector<int32_t>
    *   offset: offset of the *out* array (not a, which has zero offset, being compact)
    */
   /// BEGIN SOLUTION
-  assert(false && "Not Implemented");
+  int32_t count = 0;
+  std::vector<int32_t> indices(shape.size(), 0);
+  int32_t total_elements = 1;
+  for (auto dim : shape) {
+    total_elements *= dim;
+  }
+
+  int32_t last_dim = shape.size() - 1;
+  int32_t last_dim_size = shape[last_dim];
+
+  while (count < total_elements) {
+    int32_t out_idx = offset;
+    for (int32_t i = 0; i < indices.size(); ++i) {
+      out_idx += indices[i] * strides[i];
+    }
+    for (int32_t j = 0; j < last_dim_size; ++j) {
+      out->ptr[out_idx] = a.ptr[count];
+      out_idx += strides[last_dim];
+      count++;
+    }
+    int32_t carry = 1;
+    int k = last_dim - 1;
+    while (carry && k >= 0) {
+      indices[k] += carry;
+      carry = indices[k] / shape[k];
+      indices[k] %= shape[k];
+      k--;
+    }
+  }
   /// END SOLUTION
 }
 
@@ -100,7 +157,35 @@ void ScalarSetitem(const size_t size, scalar_t val, AlignedArray* out, std::vect
    */
 
   /// BEGIN SOLUTION
-  assert(false && "Not Implemented");
+  int32_t count = 0;
+  std::vector<int32_t> indices(shape.size(), 0);
+  int32_t total_elements = 1;
+  for (auto dim : shape) {
+    total_elements *= dim;
+  }
+
+  int32_t last_dim = shape.size() - 1;
+  int32_t last_dim_size = shape[last_dim];
+
+  while (count < total_elements) {
+    int32_t out_idx = offset;
+    for (int32_t i = 0; i < indices.size(); ++i) {
+      out_idx += indices[i] * strides[i];
+    }
+    for (int32_t j = 0; j < last_dim_size; ++j) {
+      out->ptr[out_idx] = val;
+      out_idx += strides[last_dim];
+      count++;
+    }
+    int32_t carry = 1;
+    int k = last_dim - 1;
+    while (carry && k >= 0) {
+      indices[k] += carry;
+      carry = indices[k] / shape[k];
+      indices[k] %= shape[k];
+      k--;
+    }
+  }
   /// END SOLUTION
 }
 
