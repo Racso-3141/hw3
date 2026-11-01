@@ -509,6 +509,32 @@ void Matmul(const CudaArray& a, const CudaArray& b, CudaArray* out, uint32_t M, 
 ////////////////////////////////////////////////////////////////////////////////
 
 
+__global__ void ReduceMaxKernel(const scalar_t* a, scalar_t* out, size_t reduce_size, size_t out_size) {
+  /**
+   * The CUDA kernel for the max reduction opeation.  This should effectively map a single entry in 
+   * the output array out, to the corresponding maximum value over `reduce_size` contiguous blocks
+   * in the input array a.
+   * 
+   * Args:
+   *   a: CUDA pointer to a array
+   *   out: CUDA point to out array
+   *   reduce_size: size of the dimension to reduce over
+   *   out_size: size of the output array
+   */
+  size_t gid = blockIdx.x * blockDim.x + threadIdx.x;
+
+  if (gid >= out_size) {
+    return;
+  }
+
+  size_t start_idx = gid * reduce_size;
+  scalar_t max_val = a[start_idx];
+  for (size_t i = 1; i < reduce_size; ++i) {
+    max_val = fmaxf(max_val, a[start_idx + i]);
+  }
+  out[gid] = max_val;
+}
+
 void ReduceMax(const CudaArray& a, CudaArray* out, size_t reduce_size) {
   /**
    * Reduce by taking maximum over `reduce_size` contiguous blocks.  Even though it is inefficient,
@@ -520,10 +546,36 @@ void ReduceMax(const CudaArray& a, CudaArray* out, size_t reduce_size) {
    *   redice_size: size of the dimension to reduce over
    */
   /// BEGIN SOLUTION
-  assert(false && "Not Implemented");
+  CudaDims dim = CudaOneDim(out->size);
+  ReduceMaxKernel<<<dim.grid, dim.block>>>(a.ptr, out->ptr, reduce_size, out->size);
   /// END SOLUTION
 }
 
+__global__ void ReduceSumKernel(const scalar_t* a, scalar_t* out, size_t reduce_size, size_t out_size) {
+  /**
+   * The CUDA kernel for the sum reduction opeation.  This should effectively map a single entry in 
+   * the output array out, to the corresponding sum value over `reduce_size` contiguous blocks
+   * in the input array a.
+   * 
+   * Args:
+   *   a: CUDA pointer to a array
+   *   out: CUDA point to out array
+   *   reduce_size: size of the dimension to reduce over
+   *   out_size: size of the output array
+   */
+  size_t gid = blockIdx.x * blockDim.x + threadIdx.x;
+
+  if (gid >= out_size) {
+    return;
+  }
+
+  size_t start_idx = gid * reduce_size;
+  scalar_t sum_val = 0.0f;
+  for (size_t i = 0; i < reduce_size; ++i) {
+    sum_val += a[start_idx + i];
+  }
+  out[gid] = sum_val;
+}
 
 
 void ReduceSum(const CudaArray& a, CudaArray* out, size_t reduce_size) {
@@ -537,7 +589,8 @@ void ReduceSum(const CudaArray& a, CudaArray* out, size_t reduce_size) {
    *   redice_size: size of the dimension to reduce over
    */
   /// BEGIN SOLUTION
-  assert(false && "Not Implemented");
+  CudaDims dim = CudaOneDim(out->size);
+  ReduceSumKernel<<<dim.grid, dim.block>>>(a.ptr, out->ptr, reduce_size, out->size);
   /// END SOLUTION
 }
 
@@ -608,6 +661,6 @@ PYBIND11_MODULE(ndarray_backend_cuda, m) {
 
   // m.def("matmul", Matmul);
 
-  // m.def("reduce_max", ReduceMax);
-  // m.def("reduce_sum", ReduceSum);
+  m.def("reduce_max", ReduceMax);
+  m.def("reduce_sum", ReduceSum);
 }
