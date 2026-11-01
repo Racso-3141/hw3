@@ -474,6 +474,54 @@ void EwiseTanh(const CudaArray& a, CudaArray* out) {
 // Elementwise and scalar operations
 ////////////////////////////////////////////////////////////////////////////////
 
+__global__ void MatmulKernel(const scalar_t* a, const scalar_t* b, scalar_t* out, uint32_t M,
+                             uint32_t N, uint32_t P) {
+  /**
+   * The CUDA kernel for the matrix multiplication opeation.  This should effectively map a single
+   * entry in the output array out, to the corresponding row and column in the input arrays a and b.
+   * 
+   * Args:
+   *   a: CUDA pointer to a array of size M x N
+   *   b: CUDA pointer to b array of size N x P
+   *   out: CUDA point to out array of size M x P
+   *   M: rows of a / out
+   *   N: columns of a / rows of b
+   *   P: columns of b / out
+   */
+  __shared__ scalar_t a_tile[TILE][TILE];
+  __shared__ scalar_t b_tile[TILE][TILE];
+  int row = blockIdx.y * TILE + threadIdx.y;
+  int col = blockIdx.x * TILE + threadIdx.x;
+  scalar_t c_value = 0.0f;
+
+  for (int k = 0; k < (N + TILE - 1) / TILE; ++k) {
+    if (row < M && k * TILE + threadIdx.x < N) {
+      a_tile[threadIdx.y][threadIdx.x] = a[row * N + k * TILE + threadIdx.x];
+    } else {
+      a_tile[threadIdx.y][threadIdx.x] = 0.0f;
+    }
+
+    if (col < P && k * TILE + threadIdx.y < N) {
+      b_tile[threadIdx.y][threadIdx.x] = b[(k * TILE + threadIdx.y) * P + col];
+    } else {
+      b_tile[threadIdx.y][threadIdx.x] = 0.0f;
+    }
+
+    __syncthreads();
+
+    if (row < M && col < P) {
+      for (int n = 0; n < TILE; ++n) {
+        c_value += a_tile[threadIdx.y][n] * b_tile[n][threadIdx.x];
+      }
+    }
+
+    __syncthreads();
+  }
+
+  if (row < M && col < P) {
+    out[row * P + col] = c_value;
+  }
+}
 
 void Matmul(const CudaArray& a, const CudaArray& b, CudaArray* out, uint32_t M, uint32_t N,
             uint32_t P) {
@@ -500,7 +548,9 @@ void Matmul(const CudaArray& a, const CudaArray& b, CudaArray* out, uint32_t M, 
    */
 
   /// BEGIN SOLUTION
-  assert(false && "Not Implemented");
+  dim3 block(TILE, TILE);
+  dim3 grid((P + TILE - 1) / TILE, (M + TILE - 1) / TILE);
+  MatmulKernel<<<grid, block>>>(a.ptr, b.ptr, out->ptr, M, N, P);
   /// END SOLUTION
 }
 
@@ -659,7 +709,7 @@ PYBIND11_MODULE(ndarray_backend_cuda, m) {
   m.def("ewise_exp", EwiseExp);
   m.def("ewise_tanh", EwiseTanh);
 
-  // m.def("matmul", Matmul);
+  m.def("matmul", Matmul);
 
   m.def("reduce_max", ReduceMax);
   m.def("reduce_sum", ReduceSum);
